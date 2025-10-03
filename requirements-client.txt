@@ -1,0 +1,20 @@
+# Requirements per client Python Things5 MCP + OpenAI
+# Installa con: pip install -r requirements-client.txt
+
+# OpenAI SDK
+openai>=1.0.0
+
+# HTTP requests
+requests>=2.31.0
+
+# Environment variables (opzionale)
+python-dotenv>=1.0.0
+
+# Scheduling per script automatici (opzionale)
+schedule>=1.2.0
+
+# Web framework per applicazioni web (opzionale)
+flask>=2.3.0
+
+# Logging avanzato (opzionale)
+structlog>=23.0.0
