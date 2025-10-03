@@ -1,0 +1,50 @@
+{
+  "name": "@modelcontextprotocol/server-everything",
+  "version": "0.6.2",
+  "description": "MCP server that exercises all the features of the MCP protocol",
+  "license": "MIT",
+  "author": "Anthropic, PBC (https://anthropic.com)",
+  "homepage": "https://modelcontextprotocol.io",
+  "bugs": "https://github.com/modelcontextprotocol/servers/issues",
+  "type": "module",
+  "bin": {
+    "mcp-server-everything": "dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc && shx chmod +x dist/*.js",
+    "prepare": "npm run build",
+    "watch": "tsc --watch",
+    "start": "node dist/index.js",
+    "start:streamableHttp": "node dist/streamableHttp.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:ui": "vitest --ui"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.13.0",
+    "@types/cors": "^2.8.19",
+    "@types/jsonwebtoken": "^9.0.10",
+    "axios": "^1.10.0",
+    "body-parser": "^2.2.0",
+    "cors": "^2.8.5",
+    "express": "^5.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "zod": "^3.25.7",
+    "zod-to-json-schema": "^3.24.5"
+  },
+  "devDependencies": {
+    "@modelcontextprotocol/inspector": "^0.16.8",
+    "@types/body-parser": "^1.19.6",
+    "@types/express": "^5.0.3",
+    "@vitest/coverage-v8": "^3.2.4",
+    "@vitest/ui": "^3.2.4",
+    "shx": "^0.4.0",
+    "tailwindcss": "^4.1.10",
+    "typescript": "^5.8.3",
+    "vitest": "^3.2.4"
+  },
+  "packageManager": "pnpm@10.12.1+sha512.f0dda8580f0ee9481c5c79a1d927b9164f2c478e90992ad268bbb2465a736984391d6333d2c327913578b2804af33474ca554ba29c04a8b13060a717675ae3ac"
+}

@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: mcp-things5-server
+    env: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    region: oregon
+    envVars:
+      - key: PORT
+        value: 3000
+      - key: NODE_ENV
+        value: production
+      - key: KEYCLOAK_BASE_URL
+        sync: false
+      - key: THINGS5_BASE_URL
+        sync: false
+      - key: THINGS5_RECIPES_BASE_URL
+        sync: false
+    healthCheckPath: /health
+    autoDeploy: true

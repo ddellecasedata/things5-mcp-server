@@ -1,0 +1,20 @@
+# Ignored by docker build context
+node_modules
+.pnpm-store
+# Build artefacts
+# Ora serve dist perché contiene i file compilati localmente
+# /dist
+# VCS
+.git
+.gitignore
+# IDE & editor configs
+.vscode
+.idea
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+# Tests & docs
+coverage
+test
+docs

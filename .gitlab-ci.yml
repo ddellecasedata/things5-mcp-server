@@ -1,0 +1,44 @@
+stages:
+- build
+- deploy
+
+variables:
+  ECR_IMAGE: 974479612954.dkr.ecr.eu-west-1.amazonaws.com/things5/mcp-server
+
+build:
+  stage: build
+  image: docker:dind
+  services:
+  - docker:dind
+  variables:
+    KUBERNETES_MEMORY_REQUEST: 1Gi
+    KUBERNETES_MEMORY_LIMIT: 1Gi
+  before_script:
+  - apk add --update --no-cache py-pip
+  - pip install awscli --break-system-packages
+  - $(aws ecr get-login --no-include-email --region eu-west-1)
+  - until docker info; do sleep 1; done
+  script:
+  - docker build -t $ECR_IMAGE:$CI_COMMIT_REF_NAME -t $ECR_IMAGE:$CI_COMMIT_SHORT_SHA --push .
+
+.deploy_template: &deploy_template
+  image:
+    name: bitnamilegacy/kubectl:latest
+    entrypoint: [ "" ]
+  stage: deploy
+  dependencies: []
+  needs: [ build ]
+
+deploy-staging:
+  <<: *deploy_template
+  only:
+  - staging
+  script:
+  - kubectl -n things5-staging set image deployment/mcp-server mcp-server=$ECR_IMAGE:$CI_COMMIT_SHORT_SHA
+
+deploy-production:
+  <<: *deploy_template
+  only:
+  - main
+  script:
+  - kubectl -n things5-production set image deployment/mcp-server mcp-server=$ECR_IMAGE:$CI_COMMIT_SHORT_SHA
