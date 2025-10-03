@@ -208,6 +208,102 @@ apiRouter.get('/mcp', async (req: Request, res: Response) => {
   }
 });
 
+// SSE endpoint for OpenAI MCP compatibility (HTTP/SSE transport)
+apiRouter.get('/sse', async (req: Request, res: Response) => {
+  console.error('Received MCP SSE request');
+  
+  // Set SSE headers
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    'Connection': 'keep-alive',
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'Cache-Control'
+  });
+
+  try {
+    // Require auth by default; allow unauth only if explicitly requested via ?no_auth=true
+    const noAuthParam = (req.query?.no_auth ?? '').toString().toLowerCase();
+    const allowNoAuth = ['true', '1', 'yes'].includes(noAuthParam);
+
+    let auth_token = req.auth_token;
+    if (!allowNoAuth) {
+      // For SSE, we need to handle auth differently since we can't use middleware
+      const authHeader = req.headers.authorization;
+      if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        res.write('event: error\n');
+        res.write('data: {"error": {"code": -32000, "message": "Missing Bearer token"}}\n\n');
+        res.end();
+        return;
+      }
+      
+      auth_token = authHeader.substring(7);
+      // Validate token with Keycloak (simplified validation for SSE)
+      try {
+        const keycloak = new (await import('./keycloak.js')).Keycloak();
+        const realm = keycloak.getRealmFromToken(auth_token);
+        const authServer = `${process.env.KEYCLOAK_BASE_URL}/auth/realms/${realm}`;
+        
+        const response = await fetch(`${authServer}/protocol/openid-connect/userinfo`, {
+          headers: { 'Authorization': `Bearer ${auth_token}` }
+        });
+        
+        if (!response.ok) {
+          res.write('event: error\n');
+          res.write('data: {"error": {"code": -32000, "message": "Token validation failed"}}\n\n');
+          res.end();
+          return;
+        }
+      } catch (error) {
+        res.write('event: error\n');
+        res.write('data: {"error": {"code": -32000, "message": "Token validation error"}}\n\n');
+        res.end();
+        return;
+      }
+    }
+
+    const { server, cleanup } = createServer(auth_token);
+    
+    // Create SSE transport
+    const transport = new StreamableHTTPServerTransport({
+      sessionIdGenerator: () => randomUUID(),
+      enableJsonResponse: false, // SSE mode
+      onsessioninitialized: (sessionId: string) => {
+        console.error(`SSE Session initialized with ID: ${sessionId}`);
+        transports.set(sessionId, transport);
+        
+        // Send session ID to client
+        res.write('event: session\n');
+        res.write(`data: {"sessionId": "${sessionId}"}\n\n`);
+      }
+    });
+
+    // Set up onclose handler
+    transport.onclose = async () => {
+      const sid = transport.sessionId;
+      if (sid && transports.has(sid)) {
+        console.error(`SSE Transport closed for session ${sid}`);
+        transports.delete(sid);
+        await cleanup();
+      }
+    };
+
+    // Connect the transport to the MCP server
+    await server.connect(transport);
+    
+    // Handle SSE connection
+    await transport.handleRequest(req, res);
+    
+  } catch (error) {
+    console.error('Error handling MCP SSE request:', error);
+    if (!res.headersSent) {
+      res.write('event: error\n');
+      res.write('data: {"error": {"code": -32603, "message": "Internal server error"}}\n\n');
+      res.end();
+    }
+  }
+});
+
 // Handle DELETE requests for session termination (according to MCP spec)
 apiRouter.delete('/mcp', async (req: Request, res: Response) => {
   const sessionId = req.headers['mcp-session-id'] as string | undefined;
@@ -266,7 +362,7 @@ apiRouter.get('/health', (req, res) => {
 app.use('/', apiRouter);
 
 // Start the server
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.error(`MCP Streamable HTTP Server listening on port ${PORT}`);
 });

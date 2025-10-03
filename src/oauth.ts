@@ -3,7 +3,7 @@ import { Keycloak } from "./keycloak.js";
 import bodyParser from 'body-parser';
 import axios from 'axios';
 
-import { KEYCLOAK_BASE_URL } from './config.js';
+import { KEYCLOAK_BASE_URL, KEYCLOAK_CLIENT_ID } from './config.js';
 
 function getPublicAuthorizationServer(req: any) {
   return `${req.headers['x-forwarded-proto'] || req.protocol}://${req.get('host')}`;
@@ -80,7 +80,7 @@ export class Oauth {
 
           // For Claude integration, we redirect to our MCP server facade endpoints
           const response = {
-            client_id: "mcp-server", // Use the pre-configured client in Keycloak
+            client_id: KEYCLOAK_CLIENT_ID, // Use the pre-configured client in Keycloak
             client_name: req.body.client_name || "Claude AI",
             redirect_uris: req.body.redirect_uris || ["https://claude.ai/api/mcp/auth_callback"],
             grant_types: ["authorization_code", "refresh_token"],

@@ -1,85 +1,255 @@
-# Things5 MCP Server
+# Things5 MCP Server - OpenAI Compatible
 
-Server MCP per Things5: gestione autenticazione OAuth2, integrazione API Things5, strumenti modulari e deploy Docker-ready.
+A Model Context Protocol (MCP) server for the Things5 IoT platform, **fully compatible with OpenAI MCP specifications**. Provides comprehensive device management and data access capabilities through both Streamable HTTP and HTTP/SSE transport protocols.
 
-## Funzionalità principali
-- **Autenticazione OAuth2** (Keycloak)
-- **Strumenti MCP** modulari (es. lista macchine, lettura parametri)
-- **Configurazione centralizzata** via variabili ambiente (`src/config.ts`)
-- **Server HTTP Express** con router dedicati
-- **Build e deploy Docker** ottimizzati
+## OpenAI MCP Integration
 
-## Struttura del progetto
-- `src/server/things5.ts` — Entry point server MCP
-- `src/tools/` — Tool MCP modulari (es. `listMachines`, `readParameters`)
-- `src/oauth.ts`, `src/keycloak.ts` — Middleware OAuth2/Keycloak
-- `src/config.ts` — Configurazione variabili ambiente
+This server is **fully compatible** with OpenAI's MCP specifications and can be used directly with the OpenAI Responses API. It supports:
 
-## Tool disponibili
-- **list_machines**: Elenca i device registrati
-- **read_parameters**: Leggi parametri di un device (con parsing custom)
-- *(aggiungi altri tool in `src/tools/`)*
+- **Streamable HTTP Transport** (`POST /mcp`)
+- **HTTP/SSE Transport** (`GET /sse`) 
+- **OAuth 2.0 Authentication**
+- **Dynamic Client Registration**
+- **Session Management**
+- **Tool Approval Workflows**
 
-## Quick Start
+### Quick OpenAI Integration
 
-### Sviluppo locale
+```python
+from openai import OpenAI
+
+client = OpenAI()
+
+resp = client.responses.create(
+    model="gpt-5",
+    tools=[
+        {
+            "type": "mcp",
+            "server_label": "things5",
+            "server_description": "Things5 IoT platform for device management and data access",
+            "server_url": "https://your-server.com/sse",
+            "authorization": "Bearer YOUR_ACCESS_TOKEN",
+            "require_approval": "never",
+        },
+    ],
+    input="Show me all my IoT devices and their current status",
+)
+```
+
+**[Complete OpenAI Integration Guide](./OPENAI_MCP_INTEGRATION.md)**
+
+## Features
+
+- **Device Management**: List, create, update, and manage IoT devices
+- **Data Access**: Read parameters, states, metrics, and events from devices  
+- **Machine Commands**: Execute commands on connected machines
+- **User Management**: Manage users and permissions
+- **Firmware Management**: Handle device firmware updates
+- **OAuth 2.0 Authentication**: Secure access via Keycloak integration
+- **OpenAI MCP Compatible**: Direct integration with OpenAI Responses API
+
+## Installation
+
 ```bash
-# Installa dipendenze
 npm install
+```
 
-# Compila il progetto
+## Configuration
+
+### Environment Variables
+
+Create `.env.local` with the following **OpenAI-compatible** configuration:
+
+```bash
+NODE_ENV=production
+PORT=3000
+KEYCLOAK_BASE_URL=https://auth.things5.digital
+KEYCLOAK_CLIENT_ID=mcp-server
+THINGS5_BASE_URL=http://api.things5.digital/v1
+THINGS5_RECIPES_BASE_URL=https://api.things5.digital/v1/recipes
+```
+
+### For Development
+
+Copy `.env.example` to `.env.local` and modify as needed:
+
+```bash
+cp .env.example .env.local
+```
+
+## Usage
+
+### Development
+```bash
+npm run watch
+```
+
+### Production
+```bash
 npm run build
+npm start
+```
 
-# Avvia il server
+### Streamable HTTP Server (Recommended for OpenAI)
+```bash
 npm run start:streamableHttp
 ```
 
-### Test con MCP Inspector
+## API Endpoints
+
+### MCP Protocol Endpoints
+- `POST /mcp` - Streamable HTTP transport (MCP standard)
+- `GET /sse` - **HTTP/SSE transport (OpenAI compatible)**
+- `DELETE /mcp` - Session termination
+
+### OAuth & Management
+- `GET /health` - Health check
+- `GET /.well-known/oauth-authorization-server` - OAuth metadata
+- `POST /register` - Dynamic client registration
+- `GET /authorize` - OAuth authorization
+- `POST /token` - Token endpoint
+
+## Available Tools
+
+### Device Management
+- `devicesList` - List all devices with filtering options
+- `deviceDetails` - Get detailed information about a specific device
+- `deviceCreate` - Create a new device
+- `deviceUpdate` - Update device information
+- `devicesGroupsList` - List device groups
+- `showDeviceGroup` - Show specific device group
+- `createDeviceGroupUser` - Create device group user
+
+### Data Access
+- `readParameters` - Read device parameters
+- `readSingleParameter` - Read a specific parameter
+- `statesRead` - Read device states
+- `stateReadLastValue` - Read last state value
+- `metricsRead` - Read device metrics
+- `aggregatedMetrics` - Read aggregated metrics
+- `eventsRead` - Read device events
+
+### Machine Commands
+- `machineCommandCreate` - Create machine commands
+- `machineCommandExecute` - Execute commands on machines
+- `machineCommandUpdate` - Update existing commands
+- `machineCommandDelete` - Delete commands
+
+### Overview & Monitoring
+- `overviewEvents` - Get overview of events
+- `overviewAlarms` - Get overview of alarms
+
+### User Management
+- `usersList` - List users
+- `usersDetail` - Get user details
+- `userCreate` - Create new users
+- `rolesList` - List available roles
+
+### Firmware Management
+- `deviceFirmwareDetail` - Get firmware information
+- `deviceFirmwareUpdateRequest` - Request firmware updates
+- `deviceFirmwareUpdateStatus` - Check update status
+- `deviceFirmwareUpdateCancel` - Cancel firmware updates
+
+### Actions & Recipes
+- `performAction` - Perform actions on devices
+- `startRecipe` - Start recipe execution
+
+## Authentication
+
+### OAuth 2.0 (Recommended for Production)
+
+Include your access token in the Authorization header:
+
 ```bash
-npx @modelcontextprotocol/inspector --url http://localhost:3001/mcp --transport streamable-http
+Authorization: Bearer <your-access-token>
 ```
 
-### Deploy su Render
+### Development Mode
 
-1. **Push su Git**: Carica il codice su GitHub/GitLab
-2. **Crea Web Service** su [Render](https://dashboard.render.com)
-3. **Configura**:
-   - Environment: Docker
-   - Dockerfile Path: `./Dockerfile`
-   - Aggiungi variabili d'ambiente (vedi `.env.example`)
+For development/testing, bypass authentication:
 
-📖 **Guida completa**: [DEPLOY_RENDER.md](./DEPLOY_RENDER.md)
-
-### Test Docker locale
 ```bash
-# Test build Docker
-./scripts/deploy-local.sh
-
-# Health check
-curl http://localhost:3000/health
+curl "https://your-server.com/sse?no_auth=true"
 ```
 
-- Puoi esplorare tool, inviare richieste e vedere le risposte in tempo reale.
-- Inspector supporta anche autenticazione Bearer se richiesta.
+## OpenAI MCP Usage Examples
 
-## Build & Run
+### Basic Device Listing
 
-```sh
-pnpm install
-pnpm build
-pnpm start
+```python
+resp = client.responses.create(
+    model="gpt-5",
+    tools=[{
+        "type": "mcp",
+        "server_label": "things5",
+        "server_url": "https://your-server.com/sse",
+        "authorization": "Bearer YOUR_TOKEN",
+        "require_approval": "never",
+        "allowed_tools": ["devicesList", "deviceDetails"]
+    }],
+    input="List all my connected IoT devices"
+)
 ```
 
-Per build Docker:
-```sh
-docker build -t things5-mcp-server .
-docker run -p 3001:3001 things5-mcp-server
+### With Selective Approvals
+
+```python
+resp = client.responses.create(
+    model="gpt-5",
+    tools=[{
+        "type": "mcp", 
+        "server_label": "things5",
+        "server_url": "https://your-server.com/sse",
+        "authorization": "Bearer YOUR_TOKEN",
+        "require_approval": {
+            "never": {
+                "tool_names": ["devicesList", "overviewEvents", "readParameters"]
+            }
+        }
+    }],
+    input="Show me device status and recent events"
+)
 ```
 
-## Configurazione
-- Modifica le variabili in `.env` o esportale nell’ambiente (es. `KEYCLOAK_BASE_URL`).
-- Vedi `src/config.ts` per dettagli.
+## Testing
 
-## Note
-- Il server è pensato per essere esteso facilmente: aggiungi tool in `src/tools/` e saranno registrati automaticamente.
-- Per domande o contributi: [contatta Andrea Grossetti](mailto:andrea@visup.it)
+### Run All Tests
+```bash
+npm test
+```
+
+### Run OpenAI Compatibility Tests
+```bash
+npm run test src/tests/openai-mcp.test.ts
+```
+
+## Security & Best Practices
+
+- **Always use HTTPS in production**
+- **Configure tool approvals for sensitive operations**
+- **Use `allowed_tools` to limit exposed functionality**
+- **Monitor authentication logs**
+- **Validate OAuth tokens regularly**
+
+## Troubleshooting
+
+### Common Issues
+
+1. **Token Validation Failed**: Check token expiry and Keycloak configuration
+2. **CORS Errors**: Server has CORS enabled for `*` by default
+3. **Session Issues**: Use proper session ID management for Streamable HTTP
+4. **SSE Connection Problems**: Verify WebSocket/SSE support in your environment
+
+### Debug Mode
+
+Enable detailed logging:
+
+```bash
+DEBUG=mcp:*
+LOG_LEVEL=debug
+```
+
+## License
+
+MIT
