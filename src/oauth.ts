@@ -151,7 +151,7 @@ export class Oauth {
   }
 
   private getAuthorizationServer(token: string): string {
-    const realm = this.keycloak.getRealmFromToken(token);
+    const realm = this.keycloak.getRealmFromToken(token) || 'demo10'; // Default to demo10 realm
     return `${KEYCLOAK_BASE_URL}/auth/realms/${realm}`;
   }
 
