@@ -4,6 +4,7 @@ import { Tool } from "@modelcontextprotocol/sdk/types.js";
 import { zodToJsonSchema } from "zod-to-json-schema";
 import { THINGS5_BASE_URL } from "../../config.js";
 import { success, failure } from '../utils/toolResult.js';
+import { fixArraySchemas } from '../utils/schemaUtils.js';
 
 export const MachineCommandUpdateSchema = z.object({
   machine_command_id: z.string().describe("Machine command ID to update"),
@@ -21,7 +22,7 @@ export type MachineCommandUpdateArgs = z.infer<typeof MachineCommandUpdateSchema
 export const getMachineCommandUpdateTool = (auth_token: string): Tool => ({
   name: "machine_command_update",
   description: "Update an existing machine command with new name and/or parameters.",
-  inputSchema: zodToJsonSchema(MachineCommandUpdateSchema) as any,
+  inputSchema: fixArraySchemas(zodToJsonSchema(MachineCommandUpdateSchema)) as any,
   outputSchema: zodToJsonSchema(z.object({
     command: z.any(),
   })) as any,

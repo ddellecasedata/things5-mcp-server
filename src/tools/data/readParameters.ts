@@ -4,6 +4,7 @@ import { Tool } from "@modelcontextprotocol/sdk/types.js";
 import { zodToJsonSchema } from "zod-to-json-schema";
 import { THINGS5_BASE_URL } from '../../config.js';
 import { success, failure } from '../utils/toolResult.js';
+import { fixArraySchemas } from '../utils/schemaUtils.js';
 
 // Schema basato su OpenAPI
 export const ReadParametersSchema = z.object({
@@ -26,7 +27,7 @@ export const getReadParametersTool = (auth_token: string): Tool => ({
   Usage examples:
     - "read parameters from device fridge-01" → reads all parameters from device fridge-01
   `,
-  inputSchema: zodToJsonSchema(ReadParametersSchema) as any,
+  inputSchema: fixArraySchemas(zodToJsonSchema(ReadParametersSchema)) as any,
   outputSchema: zodToJsonSchema(z.object({
     parameters: z.array(z.object({
       asset: z.string(),

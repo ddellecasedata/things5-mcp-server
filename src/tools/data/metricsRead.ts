@@ -4,6 +4,7 @@ import { Tool } from "@modelcontextprotocol/sdk/types.js";
 import { zodToJsonSchema } from "zod-to-json-schema";
 import { THINGS5_BASE_URL } from '../../config.js';
 import { success, failure } from '../utils/toolResult.js';
+import { fixArraySchemas } from '../utils/schemaUtils.js';
 
 export const MetricsReadSchema = z.object({
   device_id: z.string().describe("Device id (UUID)"),
@@ -24,7 +25,7 @@ export const getMetricsReadTool = (auth_token: string): Tool => ({
   Read a machine_variable of type metric from a device. If interested only in the last value of a metric provide last_value param. Otherwise from and to parameters are required.
   Note that to know that a machine_variable is a metric you must first get the machine firmware and see that machine_variable type is metric
   Returns a markdown summary and raw JSON.`,
-  inputSchema: zodToJsonSchema(MetricsReadSchema) as any,
+  inputSchema: fixArraySchemas(zodToJsonSchema(MetricsReadSchema)) as any,
   outputSchema: zodToJsonSchema(z.object({
     metrics: z.array(z.any()),
   })) as any,

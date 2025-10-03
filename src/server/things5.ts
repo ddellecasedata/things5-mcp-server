@@ -30,51 +30,13 @@ export const createServer = (auth_token?: string) => {
   Object.values(toolFactories).forEach((factory: any) => {
     const tool = factory(auth_token);
     
-    // Convert inputSchema to Zod schema if it's a JSON Schema object
-    let zodSchema: any = {};
-    if (tool.inputSchema && typeof tool.inputSchema === 'object') {
-      // Create a Zod object schema from the JSON Schema properties
-      const properties = tool.inputSchema.properties || {};
-      const required = tool.inputSchema.required || [];
-      
-      Object.keys(properties).forEach(key => {
-        const prop = properties[key];
-        let fieldSchema: any;
-        
-        // Map JSON Schema types to Zod types
-        switch (prop.type) {
-          case 'string':
-            fieldSchema = z.string();
-            if (prop.description) fieldSchema = fieldSchema.describe(prop.description);
-            break;
-          case 'number':
-            fieldSchema = z.number();
-            if (prop.description) fieldSchema = fieldSchema.describe(prop.description);
-            break;
-          case 'boolean':
-            fieldSchema = z.boolean();
-            if (prop.description) fieldSchema = fieldSchema.describe(prop.description);
-            break;
-          case 'array':
-            fieldSchema = z.array(z.any());
-            if (prop.description) fieldSchema = fieldSchema.describe(prop.description);
-            break;
-          case 'object':
-            fieldSchema = z.record(z.any());
-            if (prop.description) fieldSchema = fieldSchema.describe(prop.description);
-            break;
-          default:
-            fieldSchema = z.any();
-        }
-        
-        // Make optional if not in required array
-        if (!required.includes(key)) {
-          fieldSchema = fieldSchema.optional();
-        }
-        
-        zodSchema[key] = fieldSchema;
-      });
-    }
+    // Use the inputSchema directly as JSON Schema
+    // The MCP SDK will handle the conversion internally and pass it correctly to OpenAI
+    const inputSchema = tool.inputSchema || {
+      type: 'object',
+      properties: {},
+      additionalProperties: false
+    };
 
     // Register the tool with the high-level API
     server.registerTool(
@@ -82,7 +44,7 @@ export const createServer = (auth_token?: string) => {
       {
         title: tool.name,
         description: tool.description || '',
-        inputSchema: zodSchema
+        inputSchema: inputSchema  // Pass JSON Schema directly
       },
       async (input: any) => {
         console.log('[MCP] call_tool input:', JSON.stringify(input));

@@ -4,6 +4,7 @@ import { Tool } from "@modelcontextprotocol/sdk/types.js";
 import { zodToJsonSchema } from "zod-to-json-schema";
 import { THINGS5_BASE_URL } from "../../config.js";
 import { success, failure } from '../utils/toolResult.js';
+import { fixArraySchemas } from '../utils/schemaUtils.js';
 
 export const MachineCommandCreateSchema = z.object({
   machine_firmware_id: z.string().describe("Machine firmware ID to create command for"),
@@ -21,7 +22,7 @@ export type MachineCommandCreateArgs = z.infer<typeof MachineCommandCreateSchema
 export const getMachineCommandCreateTool = (auth_token: string): Tool => ({
   name: "machine_command_create",
   description: "Create a new machine command for a given machine firmware.",
-  inputSchema: zodToJsonSchema(MachineCommandCreateSchema) as any,
+  inputSchema: fixArraySchemas(zodToJsonSchema(MachineCommandCreateSchema)) as any,
   outputSchema: zodToJsonSchema(z.object({
     command: z.any(),
   })) as any,

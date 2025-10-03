@@ -4,6 +4,7 @@ import { Tool } from "@modelcontextprotocol/sdk/types.js";
 import { zodToJsonSchema } from "zod-to-json-schema";
 import { THINGS5_BASE_URL } from '../../config.js';
 import { success, failure } from '../utils/toolResult.js';
+import { fixArraySchemas } from '../utils/schemaUtils.js';
 
 export const EventsReadSchema = z.object({
   device_id: z.string().describe("Device id (UUID)"),
@@ -24,7 +25,7 @@ export const getEventsReadTool = (auth_token: string): Tool => ({
   Read  a machine_variable of type event, usually it's an alarm. 
   Note that to know that a machine variable is an event you must first get the machine firmware and see that machine_variable type is event
   Returns a markdown summary and raw JSON.`,
-  inputSchema: zodToJsonSchema(EventsReadSchema) as any,
+  inputSchema: fixArraySchemas(zodToJsonSchema(EventsReadSchema)) as any,
   outputSchema: zodToJsonSchema(z.object({
     events: z.array(z.any()),
   })) as any,

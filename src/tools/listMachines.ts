@@ -163,6 +163,13 @@ export const getListMachinesTool = (auth_token: string): Tool => {
       try {
         const organization_id = await fetchFirstOrganizationId(auth_token);
         const params = cleanQueryParams(validatedArgs);
+        
+        // Map is_connected to connected for OpenAPI compliance
+        if ('is_connected' in params) {
+          params.connected = params.is_connected;
+          delete params.is_connected;
+        }
+        
         const apiResponse = await axios.get<ApiResponse>(`${THINGS5_BASE_URL}/organizations/${organization_id}/devices`, {
           params,
           headers: auth_token ? { Authorization: `Bearer ${auth_token}` } : undefined,

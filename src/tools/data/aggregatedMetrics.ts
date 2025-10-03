@@ -4,6 +4,7 @@ import { Tool } from "@modelcontextprotocol/sdk/types.js";
 import { zodToJsonSchema } from "zod-to-json-schema";
 import { THINGS5_BASE_URL } from '../../config.js';
 import { success, failure } from '../utils/toolResult.js';
+import { fixArraySchemas } from '../utils/schemaUtils.js';
 
 export const AggregatedMetricsSchema = z.object({
   device_ids: z.array(z.string()).describe("Array of device ids (UUIDs)"),
@@ -22,7 +23,7 @@ export const getAggregatedMetricsTool = (auth_token: string): Tool => ({
   description: `
   Read machine_variables of type metric for multiple devices. 
   Returns a markdown summary and raw JSON.`,
-  inputSchema: zodToJsonSchema(AggregatedMetricsSchema) as any,
+  inputSchema: fixArraySchemas(zodToJsonSchema(AggregatedMetricsSchema)) as any,
   outputSchema: zodToJsonSchema(z.object({
     aggregated_metrics: z.array(z.any()),
   })) as any,

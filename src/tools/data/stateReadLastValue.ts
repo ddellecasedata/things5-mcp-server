@@ -4,6 +4,7 @@ import { Tool } from "@modelcontextprotocol/sdk/types.js";
 import { zodToJsonSchema } from "zod-to-json-schema";
 import { THINGS5_BASE_URL } from '../../config.js';
 import { success, failure } from '../utils/toolResult.js';
+import { fixArraySchemas } from '../utils/schemaUtils.js';
 
 export const StateReadLastValueSchema = z.object({
   device_id: z.string().describe("Device id (UUID)"),
@@ -18,7 +19,7 @@ export const getStateReadLastValueTool = (auth_token: string): Tool => ({
   Read the last value of a machine_variable of type state from a device.
   Note that to know that a machine_variable is a state you must first get the machine firmware and see that machine_variable type is state
   Returns a markdown summary and raw JSON.`,
-  inputSchema: zodToJsonSchema(StateReadLastValueSchema) as any,
+  inputSchema: fixArraySchemas(zodToJsonSchema(StateReadLastValueSchema)) as any,
   outputSchema: zodToJsonSchema(z.object({
     last_states: z.array(z.any()),
   })) as any,

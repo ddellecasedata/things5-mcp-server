@@ -4,6 +4,7 @@ import { Tool } from "@modelcontextprotocol/sdk/types.js";
 import { zodToJsonSchema } from "zod-to-json-schema";
 import { THINGS5_BASE_URL } from '../config.js';
 import { success, failure } from './utils/toolResult.js';
+import { fixArraySchemas } from './utils/schemaUtils.js';
 
 interface Action {
   id: string;
@@ -32,7 +33,7 @@ export const getPerformActionTool = (auth_token: string): Tool => ({
   Executes actions on a device. Device id is needed to perform the action, so if only device name or serial are knows it's necessary to get the device list first. Usage examples:
     - "start recipe cleaning on device fridge-01" → starts the cleaning recipe on device fridge-01. the recipe name must be included in params like this {"name": "recipe_name", "value": "cleaning"}
 `,
-  inputSchema: zodToJsonSchema(PerformActionSchema) as any,
+  inputSchema: fixArraySchemas(zodToJsonSchema(PerformActionSchema)) as any,
   outputSchema: zodToJsonSchema(z.object({
     success: z.boolean(),
     request_id: z.string().optional(),

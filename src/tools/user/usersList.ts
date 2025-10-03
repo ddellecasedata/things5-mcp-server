@@ -5,11 +5,13 @@ import { zodToJsonSchema } from 'zod-to-json-schema';
 import { THINGS5_BASE_URL } from '../../config.js';
 import { fetchFirstOrganizationId } from '../organizationUtils.js';
 import { success, failure } from '../utils/toolResult.js';
+import { fixArraySchemas } from '../utils/schemaUtils.js';
 
 export const UsersListSchema = z.object({
   search: z.string().optional().describe('Optional search string to filter users by name/email'),
   machines_groups_ids: z.array(z.string()).optional().describe('Optional array of machine group IDs to filter users associated with at least one of them'),
-  limit: z.number().optional().describe('Optional limit for the number of users to return'),
+  after: z.string().optional().describe('Pagination cursor'),
+  limit: z.number().int().optional().describe('Optional limit for the number of users to return'),
 });
 
 export type UsersListArgs = z.infer<typeof UsersListSchema>;
@@ -17,7 +19,7 @@ export type UsersListArgs = z.infer<typeof UsersListSchema>;
 export const getUsersListTool = (auth_token: string): Tool => ({
   name: "users_list",
   description: "List all users for the current organization.",
-  inputSchema: zodToJsonSchema(UsersListSchema) as any,
+  inputSchema: fixArraySchemas(zodToJsonSchema(UsersListSchema)) as any,
   outputSchema: zodToJsonSchema(z.object({
     filters: UsersListSchema,
     users: z.array(z.any()),
@@ -31,12 +33,13 @@ export const getUsersListTool = (auth_token: string): Tool => ({
       console.log(e)
       throw new Error("Invalid arguments for users_list tool: " + e);
     }
-    const { search, machines_groups_ids, limit } = args;
+    const { search, machines_groups_ids, after, limit } = args;
     const organization_id = await fetchFirstOrganizationId(auth_token);
     const url = `${THINGS5_BASE_URL}/organizations/${organization_id}/users`;
     const params: Record<string, any> = {};
     if (search) params.search = search;
     if (machines_groups_ids && machines_groups_ids.length > 0) params.machines_groups_ids = machines_groups_ids;
+    if (after) params.after = after;
     if (typeof limit !== 'undefined') params.limit = limit;
     try {
       const resp = await axios.get(url, {
