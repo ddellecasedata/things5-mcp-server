@@ -7,7 +7,9 @@ import { success, failure } from '../utils/toolResult.js';
 import { fixArraySchemas } from '../utils/schemaUtils.js';
 
 export const MetricsReadSchema = z.object({
-  device_id: z.string().describe("Device id (UUID)"),
+  device_id: z.string().optional().describe("Device ID (UUID). If not provided, use device_name or serial"),
+  device_name: z.string().optional().describe("Device name for auto-resolution (alternative to device_id)"),
+  serial: z.string().optional().describe("Device serial number for auto-resolution (alternative to device_id)"),
   from: z.string().datetime().optional().describe("Start datetime (ISO8601, optional)"),
   to: z.string().datetime().optional().describe("End datetime (ISO8601, optional)"),
   metric_names: z.array(z.string()).optional().describe("Array of metric names to filter (optional)"),
@@ -15,7 +17,10 @@ export const MetricsReadSchema = z.object({
   after: z.string().optional().describe("Pagination cursor (optional)"),
   last_value: z.boolean().optional().describe("Return only last value for each metric (optional)"),
   limit: z.number().int().max(1000).optional().describe("Max results (optional, default 1000)")
-});
+}).refine(
+  data => data.device_id || data.device_name || data.serial,
+  { message: "Must provide either device_id, device_name, or serial" }
+);
 
 export type MetricsReadArgs = z.infer<typeof MetricsReadSchema>;
 
@@ -37,6 +42,12 @@ export const getMetricsReadTool = (auth_token: string): Tool => ({
       throw new Error('Invalid arguments for metrics_read tool: ' + e);
     }
     const { device_id, from, to, metric_names, sorting, after, last_value, limit } = args;
+    
+    // device_id should be present after auto-resolution
+    if (!device_id) {
+      throw new Error('device_id is required (should be auto-resolved from device_name or serial)');
+    }
+    
     const url = `${THINGS5_BASE_URL}/devices/${encodeURIComponent(device_id)}/metrics`;
     const params: Record<string, any> = {};
     if (from) params.from = from;
