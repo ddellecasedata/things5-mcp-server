@@ -3,6 +3,7 @@ import { LoggingLevel, SetLevelRequestSchema } from "@modelcontextprotocol/sdk/t
 import * as toolFactories from "../tools/index.js";
 import { createRequire } from "node:module";
 import { z } from "zod";
+import { jsonSchemaPropertiesToZodShape } from "../utils/jsonSchemaToZod.js";
 const require = createRequire(import.meta.url);
 const pkg = require("../../package.json");
 
@@ -30,13 +31,15 @@ export const createServer = (auth_token?: string) => {
   Object.values(toolFactories).forEach((factory: any) => {
     const tool = factory(auth_token);
     
-    // Use the inputSchema directly as JSON Schema
-    // The MCP SDK will handle the conversion internally and pass it correctly to OpenAI
-    const inputSchema = tool.inputSchema || {
+    // Convert JSON Schema to Zod RawShape
+    // This preserves all type information (array items, integer vs number, enums, etc.)
+    const jsonSchema = tool.inputSchema || {
       type: 'object',
       properties: {},
       additionalProperties: false
     };
+    
+    const zodShape = jsonSchemaPropertiesToZodShape(jsonSchema);
 
     // Register the tool with the high-level API
     server.registerTool(
@@ -44,7 +47,7 @@ export const createServer = (auth_token?: string) => {
       {
         title: tool.name,
         description: tool.description || '',
-        inputSchema: inputSchema  // Pass JSON Schema directly
+        inputSchema: zodShape  // Pass Zod RawShape
       },
       async (input: any) => {
         console.log('[MCP] call_tool input:', JSON.stringify(input));
