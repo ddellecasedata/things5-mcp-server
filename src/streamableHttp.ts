@@ -78,8 +78,19 @@ apiRouter.post('/mcp', async (req: Request, res: Response) => {
 
     if (sessionId && transports.has(sessionId)) {
       // Reuse existing transport
+      console.error(`Reusing existing session: ${sessionId}`);
       transport = transports.get(sessionId)!;
-    } else if (!sessionId) {
+    } else {
+      // Create new session if:
+      // 1. No session ID provided, OR
+      // 2. Session ID provided but doesn't exist (expired/lost after server restart)
+      
+      if (sessionId) {
+        console.error(`Session ${sessionId} not found in transports, creating new session`);
+      } else {
+        console.error('No session ID provided, creating new session');
+      }
+      
       // Require auth by default; allow unauth only if explicitly requested via ?no_auth=true
       const noAuthParam = (req.query?.no_auth ?? '').toString().toLowerCase();
       const allowNoAuth = ['true', '1', 'yes'].includes(noAuthParam);
@@ -107,18 +118,17 @@ apiRouter.post('/mcp', async (req: Request, res: Response) => {
 
       const { server, cleanup } = createServer(auth_token);
 
-      // New initialization request
+      // New session initialization
       transport = new StreamableHTTPServerTransport({
         sessionIdGenerator: () => randomUUID(),
         enableJsonResponse: true,
-        onsessioninitialized: (sessionId: string) => {
+        onsessioninitialized: (newSessionId: string) => {
           // Store the transport by session ID when session is initialized
           // This avoids race conditions where requests might come in before the session is stored
-          console.error(`Session initialized with ID: ${sessionId}`);
-          transports.set(sessionId, transport);
+          console.error(`Session initialized with ID: ${newSessionId}`);
+          transports.set(newSessionId, transport);
         }
       });
-
 
       // Set up onclose handler to clean up transport when closed
       transport.onclose = async () => {
@@ -129,22 +139,12 @@ apiRouter.post('/mcp', async (req: Request, res: Response) => {
           await cleanup();
         }
       };
+      
       // Connect the transport to the MCP server BEFORE handling the request
       // so responses can flow back through the same transport
       await server.connect(transport);
       await transport.handleRequest(req, res, req.body);
       return; // Already handled
-    } else {
-      // Invalid request - no session ID or not initialization request
-      res.status(400).json({
-        jsonrpc: '2.0',
-        error: {
-          code: -32000,
-          message: 'Bad Request: No valid session ID provided',
-        },
-        id: req?.body?.id,
-      });
-      return;
     }
 
     // Handle the request with existing transport - no need to reconnect
