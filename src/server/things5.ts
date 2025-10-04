@@ -5,6 +5,7 @@ import { createRequire } from "node:module";
 import { z } from "zod";
 import { jsonSchemaPropertiesToZodShape } from "../utils/jsonSchemaToZod.js";
 import { autoResolveParameters, canAutoResolve } from "../utils/toolDependencies.js";
+import { getAvailableMachines, getMachinesSummary, getCacheInfo } from "../utils/machineContext.js";
 const require = createRequire(import.meta.url);
 const pkg = require("../../package.json");
 
@@ -51,21 +52,72 @@ export const createServer = (auth_token?: string) => {
         inputSchema: zodShape  // Pass Zod RawShape
       },
       async (input: any) => {
-        console.log('[MCP] call_tool:', tool.name);
-        console.log('[MCP] Original input:', JSON.stringify(input));
+        console.log('\n' + '='.repeat(80));
+        console.log(`[MCP] 🔧 Tool Call: ${tool.name}`);
+        console.log('='.repeat(80));
+        console.log('[MCP] Original input:', JSON.stringify(input, null, 2));
         
-        // Auto-resolve missing parameters if possible
-        let resolvedInput = input;
-        if (canAutoResolve(tool.name) && auth_token) {
-          console.log('[MCP] 🔄 Auto-resolving dependencies...');
-          resolvedInput = await autoResolveParameters(tool.name, input, auth_token);
-          
-          if (JSON.stringify(resolvedInput) !== JSON.stringify(input)) {
-            console.log('[MCP] ✅ Parameters auto-resolved:', JSON.stringify(resolvedInput));
+        // Step 1: Pre-load machine context for AI awareness
+        let machineContext;
+        if (auth_token) {
+          try {
+            console.log('\n[MCP] 📋 Pre-loading machine context...');
+            machineContext = await getAvailableMachines(auth_token);
+            
+            const cacheInfo = getCacheInfo();
+            if (cacheInfo) {
+              console.log(`[MCP] ✅ Machine context loaded: ${cacheInfo.machines} machines`);
+              console.log(`[MCP] Cache age: ${cacheInfo.age_seconds}s, expires in: ${cacheInfo.expires_in_seconds}s`);
+            }
+            
+            // Log summary for debugging
+            if (machineContext.length > 0) {
+              const connected = machineContext.filter(m => m.is_connected).length;
+              console.log(`[MCP] 🟢 ${connected} connected, 🔴 ${machineContext.length - connected} disconnected`);
+              
+              // Log first few machines for reference
+              console.log('[MCP] Available machines:');
+              machineContext.slice(0, 5).forEach(m => {
+                const status = m.is_connected ? '🟢' : '🔴';
+                console.log(`  ${status} ${m.name} (${m.serial}) - ID: ${m.id.substring(0, 8)}...`);
+              });
+              if (machineContext.length > 5) {
+                console.log(`  ... and ${machineContext.length - 5} more`);
+              }
+            }
+          } catch (error: any) {
+            console.error('[MCP] ⚠️  Failed to pre-load machine context:', error.message);
+            console.error('[MCP] Continuing without context, auto-resolution will use API calls');
           }
         }
         
-        return await tool.handler(resolvedInput, {} as any);
+        // Step 2: Auto-resolve missing parameters using machine context
+        let resolvedInput = input;
+        if (canAutoResolve(tool.name) && auth_token) {
+          console.log('\n[MCP] 🔄 Auto-resolving dependencies...');
+          resolvedInput = await autoResolveParameters(
+            tool.name, 
+            input, 
+            auth_token,
+            machineContext
+          );
+          
+          if (JSON.stringify(resolvedInput) !== JSON.stringify(input)) {
+            console.log('[MCP] ✅ Parameters auto-resolved:');
+            console.log(JSON.stringify(resolvedInput, null, 2));
+          } else {
+            console.log('[MCP] ℹ️  No parameters needed resolution');
+          }
+        }
+        
+        // Step 3: Execute tool handler
+        console.log('\n[MCP] ⚡ Executing tool handler...');
+        const result = await tool.handler(resolvedInput, {} as any);
+        
+        console.log('[MCP] ✅ Tool execution completed');
+        console.log('='.repeat(80) + '\n');
+        
+        return result;
       }
     );
   });

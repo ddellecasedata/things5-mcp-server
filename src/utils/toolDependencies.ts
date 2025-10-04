@@ -8,24 +8,31 @@
 import axios from "axios";
 import { THINGS5_BASE_URL } from "../config.js";
 import { fetchFirstOrganizationId } from "../tools/organizationUtils.js";
+import { 
+  getAvailableMachines, 
+  findMachine, 
+  resolveDeviceIdFromContext,
+  MachineInfo 
+} from "./machineContext.js";
 
 export interface ToolDependency {
   /** Parameter name that needs to be resolved */
   parameter: string;
   /** Function to resolve the parameter */
-  resolver: (args: any, auth_token: string) => Promise<string | string[] | null>;
+  resolver: (args: any, auth_token: string, machineContext?: MachineInfo[]) => Promise<string | string[] | null>;
   /** Description of what this resolver does */
   description: string;
 }
 
 /**
  * Resolve device_id from machine name or serial
- * Uses list_machines with search parameter
+ * Uses pre-loaded machine context for better performance
  */
-export async function resolveDeviceId(args: any, auth_token: string): Promise<string | null> {
-  const organizationId = await fetchFirstOrganizationId(auth_token);
-  
-  // Check if we have search hints in the args
+export async function resolveDeviceId(
+  args: any, 
+  auth_token: string,
+  machineContext?: MachineInfo[]
+): Promise<string | null> {
   const searchTerm = args.device_name || args.machine_name || args.search || args.serial;
   
   if (!searchTerm) {
@@ -35,7 +42,23 @@ export async function resolveDeviceId(args: any, auth_token: string): Promise<st
   
   console.log(`[AutoResolve] Searching device with term: "${searchTerm}"`);
   
+  // Use pre-loaded context if available (much faster!)
+  if (machineContext && machineContext.length > 0) {
+    console.log('[AutoResolve] Using pre-loaded machine context');
+    const deviceId = resolveDeviceIdFromContext(machineContext, args);
+    
+    if (deviceId) {
+      const machine = machineContext.find(m => m.id === deviceId);
+      console.log(`[AutoResolve] ✅ Found device_id: ${deviceId} (${machine?.name})`);
+      return deviceId;
+    }
+  }
+  
+  // Fallback to API call if context not available
+  console.log('[AutoResolve] ⚠️  Machine context not available, falling back to API call');
+  
   try {
+    const organizationId = await fetchFirstOrganizationId(auth_token);
     const response = await axios.get(
       `${THINGS5_BASE_URL}/organizations/${organizationId}/devices`,
       {
@@ -46,16 +69,16 @@ export async function resolveDeviceId(args: any, auth_token: string): Promise<st
     
     const devices = response.data?.data || [];
     if (devices.length === 0) {
-      console.log('[AutoResolve] No devices found');
+      console.log('[AutoResolve] ❌ No devices found');
       return null;
     }
     
     const deviceId = devices[0].id;
-    console.log(`[AutoResolve] Found device_id: ${deviceId} (${devices[0].name})`);
+    console.log(`[AutoResolve] ✅ Found device_id: ${deviceId} (${devices[0].name})`);
     return deviceId;
     
   } catch (error: any) {
-    console.error('[AutoResolve] Error resolving device_id:', error.message);
+    console.error('[AutoResolve] ❌ Error resolving device_id:', error.message);
     return null;
   }
 }
@@ -64,7 +87,11 @@ export async function resolveDeviceId(args: any, auth_token: string): Promise<st
  * Resolve machine_command_id from command name
  * Uses device_firmware_detail with include_machine_commands=true
  */
-export async function resolveMachineCommandId(args: any, auth_token: string): Promise<string | null> {
+export async function resolveMachineCommandId(
+  args: any, 
+  auth_token: string,
+  machineContext?: MachineInfo[]
+): Promise<string | null> {
   const deviceId = args.device_id || args.machine_id;
   const commandName = args.command_name || args.action;
   
@@ -109,7 +136,11 @@ export async function resolveMachineCommandId(args: any, auth_token: string): Pr
  * Resolve metric_names from device capabilities
  * Returns all available metrics if not specified
  */
-export async function resolveMetricNames(args: any, auth_token: string): Promise<string[] | null> {
+export async function resolveMetricNames(
+  args: any, 
+  auth_token: string,
+  machineContext?: MachineInfo[]
+): Promise<string[] | null> {
   const deviceId = args.device_id || args.machine_id;
   
   if (!deviceId) {
@@ -145,14 +176,41 @@ export async function resolveMetricNames(args: any, auth_token: string): Promise
 
 /**
  * Resolve machine_ids from group or organization
- * Returns all visible machines if not specified
+ * Uses pre-loaded machine context when available
  */
-export async function resolveMachineIds(args: any, auth_token: string): Promise<string[] | null> {
-  const organizationId = await fetchFirstOrganizationId(auth_token);
-  
+export async function resolveMachineIds(
+  args: any, 
+  auth_token: string,
+  machineContext?: MachineInfo[]
+): Promise<string[] | null> {
   console.log('[AutoResolve] Getting machine IDs from organization');
   
+  // Use pre-loaded context if available
+  if (machineContext && machineContext.length > 0) {
+    console.log('[AutoResolve] Using pre-loaded machine context');
+    
+    let machines = machineContext;
+    
+    // Filter by group if specified
+    if (args.machine_groups_ids && Array.isArray(args.machine_groups_ids)) {
+      // Note: machineContext doesn't include group info, would need to be enhanced
+      console.log('[AutoResolve] ⚠️  Group filtering not available in context, using all machines');
+    }
+    
+    // Apply limit
+    const limit = args.limit || machines.length;
+    machines = machines.slice(0, limit);
+    
+    const machineIds = machines.map(m => m.id);
+    console.log(`[AutoResolve] ✅ Found ${machineIds.length} machines from context`);
+    return machineIds.length > 0 ? machineIds : null;
+  }
+  
+  // Fallback to API call
+  console.log('[AutoResolve] ⚠️  Machine context not available, falling back to API call');
+  
   try {
+    const organizationId = await fetchFirstOrganizationId(auth_token);
     const response = await axios.get(
       `${THINGS5_BASE_URL}/organizations/${organizationId}/devices`,
       {
@@ -167,11 +225,11 @@ export async function resolveMachineIds(args: any, auth_token: string): Promise<
     const devices = response.data?.data || [];
     const machineIds = devices.map((d: any) => d.id);
     
-    console.log(`[AutoResolve] Found ${machineIds.length} machines`);
+    console.log(`[AutoResolve] ✅ Found ${machineIds.length} machines`);
     return machineIds.length > 0 ? machineIds : null;
     
   } catch (error: any) {
-    console.error('[AutoResolve] Error resolving machine_ids:', error.message);
+    console.error('[AutoResolve] ❌ Error resolving machine_ids:', error.message);
     return null;
   }
 }
@@ -335,12 +393,14 @@ export const TOOL_DEPENDENCIES: Record<string, ToolDependency[]> = {
  * @param toolName - Name of the tool being called
  * @param args - Arguments provided by user
  * @param auth_token - Authentication token
+ * @param machineContext - Pre-loaded machine context (optional)
  * @returns Updated args with resolved parameters
  */
 export async function autoResolveParameters(
   toolName: string,
   args: any,
-  auth_token: string
+  auth_token: string,
+  machineContext?: MachineInfo[]
 ): Promise<any> {
   const dependencies = TOOL_DEPENDENCIES[toolName];
   
@@ -363,7 +423,7 @@ export async function autoResolveParameters(
     console.log(`[AutoResolve] ${dep.description}`);
     
     try {
-      const resolvedValue = await dep.resolver(resolvedArgs, auth_token);
+      const resolvedValue = await dep.resolver(resolvedArgs, auth_token, machineContext);
       
       if (resolvedValue) {
         resolvedArgs[dep.parameter] = resolvedValue;
