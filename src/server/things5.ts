@@ -6,6 +6,7 @@ import { z } from "zod";
 import { jsonSchemaPropertiesToZodShape } from "../utils/jsonSchemaToZod.js";
 import { autoResolveParameters, canAutoResolve } from "../utils/toolDependencies.js";
 import { getAvailableMachines, getMachinesSummary, getCacheInfo } from "../utils/machineContext.js";
+import { fullSanitize } from "../utils/inputSanitizer.js";
 const require = createRequire(import.meta.url);
 const pkg = require("../../package.json");
 
@@ -56,6 +57,10 @@ export const createServer = (auth_token?: string) => {
         console.log(`[MCP] 🔧 Tool Call: ${tool.name}`);
         console.log('='.repeat(80));
         console.log('[MCP] Original input:', JSON.stringify(input, null, 2));
+        
+        // Step 0: Sanitize input to fix common AI mistakes
+        console.log('\n[MCP] 🧹 Sanitizing input...');
+        input = fullSanitize(tool.name, input);
         
         // Step 1: Pre-load machine context for AI awareness
         let machineContext;
