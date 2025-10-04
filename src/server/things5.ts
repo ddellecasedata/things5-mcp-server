@@ -4,6 +4,7 @@ import * as toolFactories from "../tools/index.js";
 import { createRequire } from "node:module";
 import { z } from "zod";
 import { jsonSchemaPropertiesToZodShape } from "../utils/jsonSchemaToZod.js";
+import { autoResolveParameters, canAutoResolve } from "../utils/toolDependencies.js";
 const require = createRequire(import.meta.url);
 const pkg = require("../../package.json");
 
@@ -50,8 +51,21 @@ export const createServer = (auth_token?: string) => {
         inputSchema: zodShape  // Pass Zod RawShape
       },
       async (input: any) => {
-        console.log('[MCP] call_tool input:', JSON.stringify(input));
-        return await tool.handler(input, {} as any);
+        console.log('[MCP] call_tool:', tool.name);
+        console.log('[MCP] Original input:', JSON.stringify(input));
+        
+        // Auto-resolve missing parameters if possible
+        let resolvedInput = input;
+        if (canAutoResolve(tool.name) && auth_token) {
+          console.log('[MCP] 🔄 Auto-resolving dependencies...');
+          resolvedInput = await autoResolveParameters(tool.name, input, auth_token);
+          
+          if (JSON.stringify(resolvedInput) !== JSON.stringify(input)) {
+            console.log('[MCP] ✅ Parameters auto-resolved:', JSON.stringify(resolvedInput));
+          }
+        }
+        
+        return await tool.handler(resolvedInput, {} as any);
       }
     );
   });
